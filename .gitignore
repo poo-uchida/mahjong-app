@@ -1,0 +1,5 @@
+# clasp設定 (scriptIdを含むため非公開)
+gas/.clasp.json
+
+# デプロイURL等のローカルメモ
+gas/deploy.local.txt
