@@ -56,7 +56,7 @@
         }
 
         localStorage.removeItem(STORAGE_KEY);
-        location.href = '/';
+        location.href = '/mahjong-app/';
       } catch (err) {
         showError(err.message === 'Failed to fetch' ? '通信に失敗しました' : err.message);
         btn.disabled = false;
