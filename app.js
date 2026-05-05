@@ -124,8 +124,8 @@ async function handleStart() {
   clearError();
   const date    = document.getElementById('date').value;
   const players = [0, 1, 2, 3].map(i => document.getElementById(`player${i}`).value.trim());
-  const uma1    = parseInt(document.getElementById('uma1').value) || 10;
-  const uma2    = parseInt(document.getElementById('uma2').value) || 5;
+  const uma1    = parseInt(document.getElementById('inputUma1').value) || 10;
+  const uma2    = parseInt(document.getElementById('inputUma2').value) || 5;
 
   const btn = document.getElementById('btnStart');
   btn.disabled = true;
