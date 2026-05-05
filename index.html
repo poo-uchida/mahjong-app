@@ -9,16 +9,29 @@
 </head>
 <body>
 
-  <!-- Page 1: 設定 -->
-  <div id="page1" class="container py-3">
-    <h1 class="h4 mb-4">麻雀成績入力</h1>
-
-    <div class="mb-4">
-      <label class="form-label small text-muted">GAS URL</label>
-      <input type="url" id="gasUrl" class="form-control form-control-sm"
-             placeholder="https://script.google.com/macros/s/...">
+  <!-- 共通ヘッダー -->
+  <nav class="navbar bg-primary navbar-dark px-3 py-2">
+    <span class="navbar-brand mb-0 h6">麻雀成績入力</span>
+    <div class="d-flex align-items-center gap-2">
+      <small id="pageIndicator" class="text-white-50"></small>
+      <button id="btnSync" class="btn btn-sm btn-outline-light d-none">同期</button>
     </div>
+  </nav>
 
+  <!-- 共通エラー表示 -->
+  <div id="errorArea" class="alert alert-danger mx-3 mt-3 py-2 d-none"></div>
+
+  <!-- Page 0: ログイン -->
+  <div id="page0" class="container py-4">
+    <div class="mb-3">
+      <label class="form-label">パスワード</label>
+      <input type="password" id="password" class="form-control" placeholder="パスワードを入力">
+    </div>
+    <button id="btnLogin" class="btn btn-primary w-100" disabled>ログイン</button>
+  </div>
+
+  <!-- Page 1: 設定 -->
+  <div id="page1" class="container py-3 d-none">
     <div class="mb-3">
       <label class="form-label">日付</label>
       <input type="date" id="date" class="form-control">
@@ -45,12 +58,12 @@
       </div>
     </div>
 
-    <button id="btnStart" class="btn btn-primary w-100">ゲーム開始</button>
+    <button id="btnStart" class="btn btn-primary w-100" disabled>ゲーム開始</button>
   </div>
 
   <!-- Page 2: 素点入力（スタブ） -->
   <div id="page2" class="container py-3 d-none">
-    <h1 class="h5 mb-1" id="p2Date"></h1>
+    <p class="h5 mb-1" id="p2Date"></p>
     <p class="mb-3">
       <a id="p2SheetUrl" href="#" target="_blank" class="small">スプレッドシートを開く →</a>
     </p>
