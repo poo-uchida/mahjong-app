@@ -75,14 +75,7 @@ function showPage(n) {
 // --- Page 0: ログイン ---
 
 function initPage0() {
-  const pwInput = document.getElementById('password');
-  const btnLogin = document.getElementById('btnLogin');
-
-  pwInput.addEventListener('input', () => {
-    btnLogin.disabled = !pwInput.value;
-  });
-
-  btnLogin.addEventListener('click', handleLogin);
+  document.getElementById('btnLogin').addEventListener('click', handleLogin);
 }
 
 async function handleLogin() {
