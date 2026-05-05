@@ -63,13 +63,36 @@
     <button id="btnStart" class="btn btn-primary w-100" disabled>ゲーム開始</button>
   </div>
 
-  <!-- Page 2: 素点入力（スタブ） -->
+  <!-- Page 2: 素点入力 -->
   <div id="page2" class="container py-3 d-none">
-    <p class="h5 mb-1" id="p2Date"></p>
-    <p class="mb-3">
-      <a id="p2SheetUrl" href="#" target="_blank" class="small">スプレッドシートを開く →</a>
-    </p>
-    <p class="text-muted">（2ページ目は準備中）</p>
+    <p class="fw-bold mb-2" id="p2RoundLabel"></p>
+    <div class="table-responsive mb-2">
+      <table class="table table-sm table-bordered mb-0">
+        <thead class="table-light">
+          <tr><th>名前</th><th>得点</th><th>ウマ</th><th>勝点</th></tr>
+        </thead>
+        <tbody id="p2InputBody"></tbody>
+      </table>
+    </div>
+    <div class="row g-2 align-items-center mb-3">
+      <div class="col-auto"><label class="col-form-label">倍率</label></div>
+      <div class="col-3">
+        <input type="number" id="multiplier" class="form-control" value="3" inputmode="numeric" min="1">
+      </div>
+    </div>
+    <button id="btnConfirm" class="btn btn-primary w-100 mb-4" disabled>得点確定</button>
+
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <span class="fw-bold">確定済みの局</span>
+      <button id="btnToggle" class="btn btn-sm btn-outline-secondary">切替</button>
+    </div>
+    <div class="table-responsive mb-3">
+      <table class="table table-sm table-bordered mb-0">
+        <thead class="table-light"><tr id="roundsHeader"></tr></thead>
+        <tbody id="roundsBody"></tbody>
+      </table>
+    </div>
+    <button id="btnEndGame" class="btn btn-success w-100" disabled>ゲーム終了</button>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
