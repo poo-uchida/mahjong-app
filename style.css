@@ -11,3 +11,9 @@ body {
 input, select, textarea {
   font-size: 16px !important;
 }
+
+/* 切替ボタン: iOSタップ時の残留ハイライト防止 */
+#btnToggle {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
