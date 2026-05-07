@@ -275,7 +275,7 @@ function renderRoundsTable() {
   // ボタンの色をモードに応じて切替
   const btn = document.getElementById('btnToggle');
   btn.className = isScaled
-    ? 'btn btn-sm btn-secondary'
+    ? 'btn btn-sm btn-primary'
     : 'btn btn-sm btn-outline-secondary';
 
   // ヘッダー: 素点モードは倍率列あり、倍率適用後は倍率列なし
