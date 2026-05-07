@@ -6,3 +6,8 @@ body {
 .container {
   max-width: 480px;
 }
+
+/* iOS Safariの自動ズーム防止 */
+input, select, textarea {
+  font-size: 16px !important;
+}
