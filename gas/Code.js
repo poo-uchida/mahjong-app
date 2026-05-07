@@ -59,51 +59,85 @@ function writeSheet(ss, data) {
   sheet.clearContents();
 
   const { players, rounds = [], venue, drinks = [] } = data;
-  const rows = [];
+  const numCols      = players.length + 3;
+  const sumCol       = players.length + 2; // 横合計の列(1-indexed)
+  const mulColLetter = String.fromCharCode('A'.charCodeAt(0) + players.length + 2); // 倍率列(G)
+  const endColLetter = String.fromCharCode('A'.charCodeAt(0) + players.length);     // E
+  const playerCols   = players.map((_, i) => String.fromCharCode('B'.charCodeAt(0) + i)); // B~E
+
+  const rows     = [];
+  const formulas = []; // { row, col, formula }
+  let rowNum = 1;
+
+  function pushRow(rowData, needsSum) {
+    rows.push(rowData);
+    if (needsSum) {
+      formulas.push({ row: rowNum, col: sumCol,
+                      formula: `=SUM(B${rowNum}:${endColLetter}${rowNum})` });
+    }
+    rowNum++;
+  }
 
   // ヘッダー
-  rows.push(['局', ...players, '横合計', '倍率']);
+  pushRow(['局', ...players, '横合計', '倍率'], false);
 
-  // 上段: 各局の勝点
+  // 上段: 各局の勝点(値)
+  const upperRowNums = [];
   rounds.forEach((r, i) => {
-    const sum = r.points.reduce((a, b) => a + b, 0);
-    rows.push([i + 1, ...r.points, sum, r.multiplier]);
+    upperRowNums.push(rowNum);
+    pushRow([i + 1, ...r.points, '', r.multiplier], true);
   });
 
-  // 中段: 勝点 × 倍率
-  rows.push(['--- 倍率適用後 ---', '', '', '', '', '', '']);
+  // 区切り
+  pushRow(['--- 倍率適用後 ---', ...Array(numCols - 1).fill('')], false);
+
+  // 中段: 勝点×倍率(スプレッド計算式)
+  let firstLowerRow = null;
+  let lastLowerRow  = null;
   rounds.forEach((r, i) => {
-    const scaled = r.points.map(p => p * r.multiplier);
-    const sum = scaled.reduce((a, b) => a + b, 0);
-    rows.push([i + 1, ...scaled, sum, r.multiplier]);
+    if (firstLowerRow === null) firstLowerRow = rowNum;
+    lastLowerRow = rowNum;
+    const upRow = upperRowNums[i];
+    playerCols.forEach((col, pi) => {
+      formulas.push({ row: rowNum, col: pi + 2,
+                      formula: `=${col}${upRow}*${mulColLetter}${upRow}` });
+    });
+    formulas.push({ row: rowNum, col: sumCol,
+                    formula: `=SUM(B${rowNum}:${endColLetter}${rowNum})` });
+    pushRow([i + 1, ...Array(players.length).fill(''), '', ''], false);
   });
 
-  // 麻雀合計
-  const mahjong = players.map((_, pi) =>
-    rounds.reduce((sum, r) => sum + r.points[pi] * r.multiplier, 0)
-  );
-  rows.push(['麻雀合計', ...mahjong, mahjong.reduce((a, b) => a + b, 0), '']);
+  // 麻雀合計: 中段の縦SUM
+  playerCols.forEach((col, pi) => {
+    formulas.push({ row: rowNum, col: pi + 2,
+                    formula: `=SUM(${col}${firstLowerRow}:${col}${lastLowerRow})` });
+  });
+  pushRow(['麻雀合計', ...Array(players.length).fill(''), '', ''], true);
 
   // 場代
   const vAmounts = venue && venue.amounts ? venue.amounts : players.map(() => 0);
   if (venue && venue.amounts) {
-    rows.push(['場代', ...vAmounts, vAmounts.reduce((a, b) => a + b, 0), '']);
+    pushRow(['場代', ...vAmounts, '', ''], true);
   }
 
   // 飲み代(複数軒対応)
-  const drinkTotals = players.map(() => 0);
   drinks.forEach((d, i) => {
     if (d && d.amounts) {
-      rows.push([`飲み代${drinks.length > 1 ? i + 1 : ''}`, ...d.amounts, d.amounts.reduce((a, b) => a + b, 0), '']);
-      d.amounts.forEach((amt, pi) => { drinkTotals[pi] += amt; });
+      pushRow([`飲み代${drinks.length > 1 ? i + 1 : ''}`, ...d.amounts, '', ''], true);
     }
   });
 
-  // 収支合計
-  const total = players.map((_, pi) => mahjong[pi] + vAmounts[pi] + drinkTotals[pi]);
-  rows.push(['収支合計', ...total, total.reduce((a, b) => a + b, 0), '']);
+  // 収支合計は3ページ目実装時に追加
+  // const total = ...
+  // pushRow(['収支合計', ...total, '', ''], true);
 
-  sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
+  // 値を一括書き込み
+  sheet.getRange(1, 1, rows.length, numCols).setValues(rows);
+
+  // 計算式を書き込み
+  formulas.forEach(({ row, col, formula }) => {
+    sheet.getRange(row, col).setFormula(formula);
+  });
 }
 
 function respond(data) {

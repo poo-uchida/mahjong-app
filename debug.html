@@ -43,16 +43,25 @@
       showError('');
 
       try {
+        // 常に認証を先に確認
+        const authRes  = await fetch(GAS_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'auth', password }),
+        });
+        const authJson = await authRes.json();
+        if (!authJson.ok) throw new Error(authJson.error === 'unauthorized' ? 'パスワードが違います' : authJson.error);
+
+        // 認証OK: spreadsheetIdがあれば削除
         const raw = localStorage.getItem(STORAGE_KEY);
         const spreadsheetId = raw ? JSON.parse(raw).spreadsheetId : null;
 
         if (spreadsheetId) {
-          const res = await fetch(GAS_URL, {
+          const delRes  = await fetch(GAS_URL, {
             method: 'POST',
             body: JSON.stringify({ action: 'delete', password, spreadsheetId }),
           });
-          const json = await res.json();
-          if (!json.ok) throw new Error(json.error);
+          const delJson = await delRes.json();
+          if (!delJson.ok) throw new Error(delJson.error);
         }
 
         localStorage.removeItem(STORAGE_KEY);
