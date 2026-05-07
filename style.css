@@ -12,8 +12,29 @@ input, select, textarea {
   font-size: 16px !important;
 }
 
-/* 切替ボタン: iOSタップ時の残留ハイライト防止 */
+/* 切替ボタン: active/hoverでも色が変わらないようBootstrapのCSS変数を上書き */
 #btnToggle {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+}
+#btnToggle.btn-primary {
+  --bs-btn-active-bg: #0d6efd;
+  --bs-btn-active-border-color: #0d6efd;
+  --bs-btn-active-color: #fff;
+  --bs-btn-hover-bg: #0d6efd;
+  --bs-btn-hover-border-color: #0d6efd;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-focus-shadow-rgb: none;
+}
+#btnToggle.btn-outline-secondary {
+  --bs-btn-active-bg: transparent;
+  --bs-btn-active-border-color: #6c757d;
+  --bs-btn-active-color: #6c757d;
+  --bs-btn-hover-bg: transparent;
+  --bs-btn-hover-border-color: #6c757d;
+  --bs-btn-hover-color: #6c757d;
+}
+#btnToggle:focus,
+#btnToggle:focus-visible {
+  box-shadow: none !important;
 }
