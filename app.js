@@ -186,9 +186,10 @@ function calcRound(raw, uma1, uma2) {
 
 function initPage2() {
   document.getElementById('btnConfirm').addEventListener('click', handleConfirm);
-  document.getElementById('btnToggle').addEventListener('click', () => {
+  document.getElementById('btnToggle').addEventListener('click', (e) => {
     listMode = listMode === 'scaled' ? 'raw' : 'scaled';
     renderRoundsTable();
+    e.currentTarget.blur();
   });
   document.getElementById('btnEndGame').addEventListener('click', handleEndGame);
   document.getElementById('multiplier').addEventListener('input', validateConfirmButton);
