@@ -186,10 +186,9 @@ function calcRound(raw, uma1, uma2) {
 
 function initPage2() {
   document.getElementById('btnConfirm').addEventListener('click', handleConfirm);
-  document.getElementById('btnToggle').addEventListener('click', (e) => {
+  document.getElementById('btnToggle').addEventListener('click', () => {
     listMode = listMode === 'scaled' ? 'raw' : 'scaled';
     renderRoundsTable();
-    e.currentTarget.blur();
   });
   document.getElementById('btnEndGame').addEventListener('click', handleEndGame);
   document.getElementById('multiplier').addEventListener('input', validateConfirmButton);
@@ -272,6 +271,12 @@ function validateEndGame() {
 function renderRoundsTable() {
   const { players, rounds } = state;
   const isScaled = listMode === 'scaled';
+
+  // ボタンの色をモードに応じて切替
+  const btn = document.getElementById('btnToggle');
+  btn.className = isScaled
+    ? 'btn btn-sm btn-secondary'
+    : 'btn btn-sm btn-outline-secondary';
 
   // ヘッダー: 素点モードは倍率列あり、倍率適用後は倍率列なし
   const header = document.getElementById('roundsHeader');
