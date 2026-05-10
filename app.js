@@ -205,7 +205,7 @@ function renderPage2() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="align-middle">${name}</td>
-      <td><input type="number" id="score${i}" class="form-control form-control-sm score-input" inputmode="numeric"></td>
+      <td class="score-col"><input type="number" id="score${i}" class="form-control form-control-sm" inputmode="numeric"></td>
       <td class="align-middle text-end" id="uma${i}"></td>
       <td class="align-middle text-end" id="pts${i}"></td>
     `;
