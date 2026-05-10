@@ -152,28 +152,35 @@ async function handleStart() {
 // --- Page 2: 素点入力 ---
 
 let listMode = 'scaled'; // 'scaled' | 'raw'
+let calcDone = false;
 
 function gosharokunyu(v) {
   return Math.floor(v + 0.4);
 }
 
-function calcBasePoints(raw) {
-  const order = [0, 1, 2, 3].sort((a, b) => raw[b] - raw[a]);
-  const rounded = raw.map(s => gosharokunyu(s / 1000));
-  const base = new Array(4);
-  order.slice(1).forEach(pi => { base[pi] = rounded[pi] - 30; });
-  const firstIdx = order[0];
-  base[firstIdx] = -order.slice(1).reduce((sum, pi) => sum + base[pi], 0);
-  return base;
-}
-
 function calcRound(raw, uma1, uma2) {
+  // 降順で順位決定
   const order = [0, 1, 2, 3].sort((a, b) => raw[b] - raw[a]);
   const umaList = [uma1, uma2, -uma2, -uma1];
+
+  // ウマ(プレイヤー別)
   const uma = new Array(4);
   order.forEach((pi, rank) => { uma[pi] = umaList[rank]; });
-  const base = calcBasePoints(raw);
+
+  // 五捨六入
+  const rounded = raw.map(s => gosharokunyu(s / 1000));
+
+  // 2〜4位の勝点(ウマ込み前)
+  const base = new Array(4);
+  order.slice(1).forEach(pi => { base[pi] = rounded[pi] - 30; });
+
+  // 1位の勝点(ウマ込み前) = 残りの合計を打ち消す
+  const firstIdx = order[0];
+  base[firstIdx] = -order.slice(1).reduce((sum, pi) => sum + base[pi], 0);
+
+  // ウマを加算
   const points = base.map((p, i) => p + uma[i]);
+
   return { points, uma };
 }
 
@@ -188,6 +195,7 @@ function initPage2() {
 }
 
 function renderPage2() {
+  calcDone = false;
   document.getElementById('p2RoundLabel').textContent = `第${state.rounds.length + 1}局の入力`;
 
   // 入力テーブル生成
@@ -197,16 +205,14 @@ function renderPage2() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="align-middle">${name}</td>
-      <td><input type="number" id="score${i}" class="form-control form-control-sm score-input" inputmode="numeric"></td>
-      <td><input type="number" id="uma${i}" class="form-control form-control-sm uma-input" inputmode="numeric"></td>
-      <td class="align-middle text-end fw-bold" id="pts${i}"></td>
+      <td><input type="number" id="score${i}" class="form-control form-control-sm" inputmode="numeric"></td>
+      <td class="align-middle text-end" id="uma${i}"></td>
+      <td class="align-middle text-end" id="pts${i}"></td>
     `;
     tbody.appendChild(tr);
     document.getElementById(`score${i}`).addEventListener('focusin', handleFocusIn);
     document.getElementById(`score${i}`).addEventListener('focusout', handleFocusOut);
     document.getElementById(`score${i}`).addEventListener('input', validateConfirmButton);
-    document.getElementById(`uma${i}`).addEventListener('focusout', handleUmaFocusOut);
-    document.getElementById(`uma${i}`).addEventListener('input', validateConfirmButton);
   });
 
   renderRoundsTable();
@@ -223,9 +229,10 @@ function getScores() {
 
 function handleFocusIn() {
   [0, 1, 2, 3].forEach(i => {
-    document.getElementById(`uma${i}`).value = '';
+    document.getElementById(`uma${i}`).textContent = '';
     document.getElementById(`pts${i}`).textContent = '';
   });
+  calcDone = false;
   validateConfirmButton();
 }
 
@@ -234,42 +241,26 @@ function handleFocusOut() {
   const nullCount = scores.filter(v => v === null).length;
   if (nullCount !== 1) return;
 
+  // 空欄1つを自動計算
   const nullIdx = scores.indexOf(null);
   const sum = scores.reduce((s, v) => v !== null ? s + v : s, 0);
   scores[nullIdx] = 100000 - sum;
   document.getElementById(`score${nullIdx}`).value = scores[nullIdx];
 
+  // ウマ・勝点を表示
   const { points, uma } = calcRound(scores, state.uma1, state.uma2);
   [0, 1, 2, 3].forEach(i => {
-    document.getElementById(`uma${i}`).value = uma[i];
+    document.getElementById(`uma${i}`).textContent = (uma[i] > 0 ? '+' : '') + uma[i];
     document.getElementById(`pts${i}`).textContent = (points[i] > 0 ? '+' : '') + points[i];
   });
-  validateConfirmButton();
-}
-
-function handleUmaFocusOut() {
-  const scores = getScores();
-  if (scores.some(v => v === null)) return;
-
-  const umaValues = [0, 1, 2, 3].map(i => {
-    const v = parseInt(document.getElementById(`uma${i}`).value);
-    return isNaN(v) ? null : v;
-  });
-  if (umaValues.some(v => v === null)) return;
-
-  const base = calcBasePoints(scores);
-  const points = base.map((p, i) => p + umaValues[i]);
-  [0, 1, 2, 3].forEach(i => {
-    document.getElementById(`pts${i}`).textContent = (points[i] > 0 ? '+' : '') + points[i];
-  });
+  calcDone = true;
   validateConfirmButton();
 }
 
 function validateConfirmButton() {
-  const scores   = getScores();
-  const umaVals  = [0, 1, 2, 3].map(i => document.getElementById(`uma${i}`).value);
+  const scores = getScores();
   const multiplier = parseInt(document.getElementById('multiplier').value);
-  const ok = scores.every(v => v !== null) && umaVals.every(v => v !== '') && multiplier > 0;
+  const ok = scores.every(v => v !== null) && calcDone && multiplier > 0;
   document.getElementById('btnConfirm').disabled = !ok;
 }
 
@@ -319,9 +310,7 @@ async function handleConfirm() {
   const multiplier = parseInt(document.getElementById('multiplier').value);
   if (scores.some(v => v === null) || !multiplier) return;
 
-  const umaValues = [0, 1, 2, 3].map(i => parseInt(document.getElementById(`uma${i}`).value) || 0);
-  const base   = calcBasePoints(scores);
-  const points = base.map((p, i) => p + umaValues[i]);
+  const { points } = calcRound(scores, state.uma1, state.uma2);
   state.rounds.push({ points, multiplier });
   saveState();
 
