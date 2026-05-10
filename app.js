@@ -280,16 +280,15 @@ function renderRoundsTable() {
 
   // ヘッダー: 素点モードは倍率列あり、倍率適用後は倍率列なし
   const header = document.getElementById('roundsHeader');
-  header.innerHTML = `<th>局</th>${players.map(n => `<th>${n}</th>`).join('')}<th>計</th>${isScaled ? '' : '<th>倍</th>'}`;
+  header.innerHTML = `<th>局</th>${players.map(n => `<th>${n}</th>`).join('')}${isScaled ? '' : '<th>倍</th>'}`;
 
   // 行
   const tbody = document.getElementById('roundsBody');
   tbody.innerHTML = '';
   rounds.forEach((r, i) => {
     const vals = isScaled ? r.points.map(p => p * r.multiplier) : r.points;
-    const sum  = vals.reduce((a, b) => a + b, 0);
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${i + 1}</td>${vals.map(v => `<td>${v > 0 ? '+' : ''}${v}</td>`).join('')}<td>${sum}</td>${isScaled ? '' : `<td>${r.multiplier}</td>`}`;
+    tr.innerHTML = `<td>${i + 1}</td>${vals.map(v => `<td>${v > 0 ? '+' : ''}${v}</td>`).join('')}${isScaled ? '' : `<td>${r.multiplier}</td>`}`;
     tbody.appendChild(tr);
   });
 
@@ -300,7 +299,7 @@ function renderRoundsTable() {
     );
     const tr = document.createElement('tr');
     tr.className = 'fw-bold table-light';
-    tr.innerHTML = `<td>計</td>${totals.map(v => `<td>${v > 0 ? '+' : ''}${v}</td>`).join('')}<td>${totals.reduce((a, b) => a + b, 0)}</td>`;
+    tr.innerHTML = `<td>計</td>${totals.map(v => `<td>${v > 0 ? '+' : ''}${v}</td>`).join('')}`;
     tbody.appendChild(tr);
   }
 }
@@ -352,6 +351,10 @@ function checkResume() {
 }
 
 // --- 初期化 ---
+
+document.addEventListener('focusin', (e) => {
+  if (e.target.tagName === 'INPUT') e.target.select();
+});
 
 document.addEventListener('DOMContentLoaded', () => {
   initPage0();
