@@ -7,6 +7,10 @@ body {
   max-width: 480px;
 }
 
+/* 素点入力・ウマ入力の幅 */
+.score-input { width: 5rem; }
+.uma-input   { width: 3.5rem; }
+
 /* iOS Safariの自動ズーム防止 */
 input, select, textarea {
   font-size: 16px !important;
