@@ -336,6 +336,7 @@ async function handleConfirm() {
 }
 
 function handleEndGame() {
+  if (!confirm('ゲームを終了して精算に進みますか？')) return;
   state.currentPage = 3;
   state.phase = 'venue';
   saveState();
