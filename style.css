@@ -8,7 +8,7 @@ body {
 }
 
 /* 素点入力列の幅 */
-.score-col { width: 5rem; }
+.score-col { width: 7.5rem; }
 
 /* iOS Safariの自動ズーム防止 */
 input, select, textarea {
