@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>麻雀成績入力</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 
@@ -95,7 +95,55 @@
     <button id="btnEndGame" class="btn btn-success w-100" disabled>ゲーム終了</button>
   </div>
 
+  <!-- Page 3: 精算 -->
+  <div id="page3" class="container py-3 d-none">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <span class="fw-bold small">局結果</span>
+      <button id="btnToggle3" class="btn btn-sm btn-primary">切替</button>
+    </div>
+    <div class="table-responsive mb-3">
+      <table class="table table-sm table-bordered mb-0">
+        <thead class="table-light"><tr id="p3RoundsHeader"></tr></thead>
+        <tbody id="p3RoundsBody"></tbody>
+      </table>
+    </div>
+
+    <h6 id="p3PhaseLabel" class="fw-bold mb-2"></h6>
+    <div class="row g-2 align-items-center mb-2">
+      <div class="col-auto"><label class="col-form-label">総額</label></div>
+      <div class="col-4">
+        <input type="number" id="p3TotalInput" class="form-control" inputmode="numeric" min="1" placeholder="0">
+      </div>
+      <div class="col-auto"><span class="col-form-label">円</span></div>
+    </div>
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <span class="small">丸め単位</span>
+      <div class="btn-group btn-group-sm">
+        <button class="btn btn-secondary round-unit-btn" data-unit="1">1円</button>
+        <button class="btn btn-outline-secondary round-unit-btn" data-unit="10">10円</button>
+        <button class="btn btn-outline-secondary round-unit-btn" data-unit="100">100円</button>
+      </div>
+    </div>
+    <div class="table-responsive mb-3">
+      <table class="table table-sm table-bordered mb-0">
+        <thead class="table-light">
+          <tr><th></th><th class="text-end">単純割</th><th>調整</th><th class="text-end">合計</th><th class="text-center">支払い</th></tr>
+        </thead>
+        <tbody id="p3SettleBody"></tbody>
+        <tfoot class="table-light">
+          <tr>
+            <td>合計</td><td></td>
+            <td class="text-end" id="p3Shortfall"></td>
+            <td class="text-end fw-bold" id="p3GrandTotal"></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <button id="btnConfirmPage3" class="btn btn-primary w-100" disabled>金額確定</button>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="app.js?v=1"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>

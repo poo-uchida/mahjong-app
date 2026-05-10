@@ -336,8 +336,204 @@ async function handleConfirm() {
 }
 
 function handleEndGame() {
+  state.currentPage = 3;
+  state.phase = 'venue';
+  saveState();
   showPage(3);
-  // renderPage3(); // 3ページ目実装時に追加
+  renderPage3();
+}
+
+// --- Page 3: 精算 ---
+
+let p3ListMode = 'scaled';
+let p3RoundUnit = 1;
+
+function initPage3() {
+  document.getElementById('btnToggle3').addEventListener('click', () => {
+    p3ListMode = p3ListMode === 'scaled' ? 'raw' : 'scaled';
+    renderP3RoundsTable();
+  });
+
+  document.getElementById('p3TotalInput').addEventListener('input', () => {
+    updateP3Table();
+    validateP3();
+  });
+
+  document.querySelectorAll('.round-unit-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      p3RoundUnit = parseInt(e.currentTarget.dataset.unit);
+      updateRoundUnitBtns();
+      updateP3Table();
+      validateP3();
+    });
+  });
+
+  document.getElementById('btnConfirmPage3').addEventListener('click', handleConfirmPage3);
+}
+
+function renderPage3() {
+  p3ListMode = 'scaled';
+  renderP3RoundsTable();
+  document.getElementById('p3PhaseLabel').textContent =
+    state.phase === 'venue' ? '場代の精算' : '飲み代の精算';
+  resetP3Input();
+}
+
+function renderP3RoundsTable() {
+  const { players, rounds } = state;
+  const isScaled = p3ListMode === 'scaled';
+
+  const btn = document.getElementById('btnToggle3');
+  btn.className = isScaled ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline-secondary';
+
+  document.getElementById('p3RoundsHeader').innerHTML =
+    `<th>局</th>${players.map(n => `<th>${n}</th>`).join('')}${isScaled ? '' : '<th>倍</th>'}`;
+
+  const tbody = document.getElementById('p3RoundsBody');
+  tbody.innerHTML = '';
+  rounds.forEach((r, i) => {
+    const vals = isScaled ? r.points.map(p => p * r.multiplier) : r.points;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i + 1}</td>${vals.map(v => `<td>${v > 0 ? '+' : ''}${v}</td>`).join('')}${isScaled ? '' : `<td>${r.multiplier}</td>`}`;
+    tbody.appendChild(tr);
+  });
+
+  if (isScaled && rounds.length > 0) {
+    const totals = players.map((_, pi) =>
+      rounds.reduce((s, r) => s + r.points[pi] * r.multiplier, 0)
+    );
+    const tr = document.createElement('tr');
+    tr.className = 'fw-bold table-light';
+    tr.innerHTML = `<td>計</td>${totals.map(v => `<td>${v > 0 ? '+' : ''}${v}</td>`).join('')}`;
+    tbody.appendChild(tr);
+  }
+}
+
+function resetP3Input() {
+  p3RoundUnit = 1;
+  document.getElementById('p3TotalInput').value = '';
+  updateRoundUnitBtns();
+  renderP3SettleTable();
+  validateP3();
+}
+
+function updateRoundUnitBtns() {
+  document.querySelectorAll('.round-unit-btn').forEach(btn => {
+    const unit = parseInt(btn.dataset.unit);
+    btn.className = `btn btn-sm round-unit-btn ${unit === p3RoundUnit ? 'btn-secondary' : 'btn-outline-secondary'}`;
+  });
+}
+
+function calcP3Base() {
+  const total = parseInt(document.getElementById('p3TotalInput').value) || 0;
+  if (total <= 0) return [0, 0, 0, 0];
+  const base = Math.floor(total / 4 / p3RoundUnit) * p3RoundUnit;
+  return [-base, -base, -base, -base];
+}
+
+function renderP3SettleTable() {
+  const { players } = state;
+  const base = calcP3Base();
+  const tbody = document.getElementById('p3SettleBody');
+  tbody.innerHTML = '';
+
+  players.forEach((name, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="align-middle">${name}</td>
+      <td class="text-end align-middle" id="p3Base${i}">${base[i] || ''}</td>
+      <td><input type="number" id="p3Adj${i}" class="form-control form-control-sm" value="0"></td>
+      <td class="text-end align-middle" id="p3RowTotal${i}">${base[i] || ''}</td>
+      <td class="text-center align-middle"><input type="radio" name="p3Payer" value="${i}" class="form-check-input"></td>
+    `;
+    tbody.appendChild(tr);
+    document.getElementById(`p3Adj${i}`).addEventListener('input', () => {
+      updateP3Table();
+      validateP3();
+    });
+  });
+
+  document.querySelectorAll('input[name="p3Payer"]').forEach(r => {
+    r.addEventListener('change', validateP3);
+  });
+
+  updateP3Totals(base);
+}
+
+function updateP3Table() {
+  const base = calcP3Base();
+  [0, 1, 2, 3].forEach(i => {
+    const baseEl = document.getElementById(`p3Base${i}`);
+    if (!baseEl) return;
+    baseEl.textContent = base[i] || '';
+    const adj = parseInt(document.getElementById(`p3Adj${i}`)?.value) || 0;
+    document.getElementById(`p3RowTotal${i}`).textContent = base[i] + adj;
+  });
+  updateP3Totals(base);
+}
+
+function updateP3Totals(base) {
+  const total = parseInt(document.getElementById('p3TotalInput').value) || 0;
+  const adjSum = [0, 1, 2, 3].reduce((s, i) =>
+    s + (parseInt(document.getElementById(`p3Adj${i}`)?.value) || 0), 0);
+  const grandTotal = base.reduce((a, b) => a + b, 0) + adjSum;
+  const shortfall  = total + grandTotal;
+
+  document.getElementById('p3Shortfall').textContent =
+    total > 0 ? (shortfall !== 0 ? `不足: ${shortfall}` : '✓') : '';
+  document.getElementById('p3GrandTotal').textContent = total > 0 ? grandTotal : '';
+}
+
+function validateP3() {
+  const total      = parseInt(document.getElementById('p3TotalInput').value) || 0;
+  const base       = calcP3Base();
+  const adjSum     = [0, 1, 2, 3].reduce((s, i) =>
+    s + (parseInt(document.getElementById(`p3Adj${i}`)?.value) || 0), 0);
+  const grandTotal = base.reduce((a, b) => a + b, 0) + adjSum;
+  const payerOk    = !!document.querySelector('input[name="p3Payer"]:checked');
+  document.getElementById('btnConfirmPage3').disabled =
+    !(total > 0 && grandTotal === -total && payerOk);
+}
+
+async function handleConfirmPage3() {
+  clearError();
+  const total      = parseInt(document.getElementById('p3TotalInput').value) || 0;
+  const base       = calcP3Base();
+  const adjust     = [0, 1, 2, 3].map(i => parseInt(document.getElementById(`p3Adj${i}`)?.value) || 0);
+  const amounts    = base.map((b, i) => b + adjust[i]);
+  const payerIndex = parseInt(document.querySelector('input[name="p3Payer"]:checked').value);
+  const entry      = { total, payerIndex, roundUnit: p3RoundUnit, base, adjust, amounts };
+
+  const btn = document.getElementById('btnConfirmPage3');
+  btn.disabled = true;
+  btn.textContent = '送信中...';
+
+  const prevVenue  = state.venue;
+  const prevDrinks = [...state.drinks];
+  const prevPhase  = state.phase;
+
+  if (state.phase === 'venue') {
+    state.venue = entry;
+    state.phase = 'drink';
+  } else {
+    state.drinks = [...state.drinks, entry];
+  }
+
+  try {
+    const res = await gasRequest({ action: 'save', spreadsheetId: state.spreadsheetId, data: state });
+    if (!res.ok) throw new Error(res.error);
+    saveState();
+    document.getElementById('p3PhaseLabel').textContent = '飲み代の精算';
+    resetP3Input();
+  } catch (err) {
+    state.venue  = prevVenue;
+    state.drinks = prevDrinks;
+    state.phase  = prevPhase;
+    showError('保存に失敗しました: ' + err.message);
+  } finally {
+    btn.textContent = '金額確定';
+    validateP3();
+  }
 }
 
 // --- レジューム ---
@@ -348,6 +544,7 @@ function checkResume() {
   state = saved;
   showPage(state.currentPage);
   if (state.currentPage === 2) renderPage2();
+  if (state.currentPage === 3) renderPage3();
 }
 
 // --- 初期化 ---
@@ -360,5 +557,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initPage0();
   initPage1();
   initPage2();
+  initPage3();
   checkResume();
 });
