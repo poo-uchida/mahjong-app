@@ -440,7 +440,7 @@ function renderP3Summary() {
   tbody.innerHTML = '';
   if (rounds.length === 0) return;
 
-  function fmt(v) { return v === 0 ? '' : (v > 0 ? '+' : '') + v.toLocaleString(); }
+  function fmt(v) { return v === 0 ? '' : v.toLocaleString(); }
 
   function addRow(label, values, cls) {
     const tr = document.createElement('tr');
