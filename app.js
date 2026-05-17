@@ -457,22 +457,18 @@ function renderP3Summary() {
   if (!venue || !venue.amounts) return;
 
   addRow('場代', venue.amounts);
-  const vPayment = players.map((_, i) => i === venue.payerIndex ? venue.total : 0);
-  addRow('店舗支払い', vPayment);
+  addRow('店舗支払い', venue.payment);
 
   const validDrinks = drinks.filter(d => d && d.amounts);
   validDrinks.forEach((d, i) => {
     const label = validDrinks.length > 1 ? `飲み代${i + 1}` : '飲み代';
     addRow(label, d.amounts);
-    const dPayment = players.map((_, pi) => pi === d.payerIndex ? d.total : 0);
-    addRow('店舗支払い', dPayment);
+    addRow('店舗支払い', d.payment);
   });
 
   const balance = players.map((_, pi) => {
-    let s = mahjongSettle[pi] + venue.amounts[pi] + vPayment[pi];
-    validDrinks.forEach(d => {
-      s += d.amounts[pi] + (pi === d.payerIndex ? d.total : 0);
-    });
+    let s = mahjongSettle[pi] + venue.amounts[pi] + venue.payment[pi];
+    validDrinks.forEach(d => { s += d.amounts[pi] + d.payment[pi]; });
     return s;
   });
   addRow('収支合計', balance, 'fw-bold table-light');
@@ -601,7 +597,8 @@ async function handleConfirmPage3() {
   const adjust     = [0, 1, 2, 3].map(i => parseInt(document.getElementById(`p3Adj${i}`)?.value) || 0);
   const amounts    = base.map((b, i) => b + adjust[i]);
   const payerIndex = parseInt(document.querySelector('input[name="p3Payer"]:checked').value);
-  const entry      = { total, payerIndex, roundUnit: p3RoundUnit, base, adjust, amounts };
+  const payment    = state.players.map((_, i) => i === payerIndex ? total : 0);
+  const entry      = { total, payerIndex, roundUnit: p3RoundUnit, base, adjust, amounts, payment };
 
   const btn = document.getElementById('btnConfirmPage3');
   btn.disabled = true;

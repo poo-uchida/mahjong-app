@@ -61,6 +61,48 @@ function handleLoad(body) {
     rounds.push({ points, multiplier });
   }
 
+  // 精算セクションから venue・drinks を再構築
+  const settleIdx = values.findIndex(row => row[0] === '--- 精算 ---');
+  if (settleIdx !== -1) {
+    let r = settleIdx + 1;
+    if (r < values.length && String(values[r][0]) === '麻雀精算') r++; // 麻雀精算をスキップ
+
+    // 店舗支払い行をパース: 複数人分散に対応
+    function parsePayment(row) {
+      const payment = row.slice(1, 5).map(Number);
+      const payerIndex = payment.findIndex(v => v > 0); // 後方互換用(最初の支払者)
+      const total = payment.reduce((s, v) => s + v, 0);
+      return { payment, payerIndex: Math.max(payerIndex, 0), total };
+    }
+
+    // 場代
+    if (r < values.length && values[r][0] === '場代') {
+      const amounts = values[r].slice(1, 5).map(Number);
+      r++;
+      let parsed = { payment: [0,0,0,0], payerIndex: 0, total: 0 };
+      if (r < values.length && String(values[r][0]) === '店舗支払い') {
+        parsed = parsePayment(values[r]);
+        r++;
+      }
+      savedState.venue = { ...(savedState.venue || {}), amounts, ...parsed };
+    }
+
+    // 飲み代(複数軒対応)
+    const drinks = [];
+    while (r < values.length && String(values[r][0]).startsWith('飲み代')) {
+      const amounts = values[r].slice(1, 5).map(Number);
+      r++;
+      let parsed = { payment: [0,0,0,0], payerIndex: 0, total: 0 };
+      if (r < values.length && String(values[r][0]).startsWith('店舗支払い')) {
+        parsed = parsePayment(values[r]);
+        r++;
+      }
+      const existing = savedState.drinks && savedState.drinks[drinks.length];
+      drinks.push({ ...(existing || {}), amounts, ...parsed });
+    }
+    if (drinks.length > 0) savedState.drinks = drinks;
+  }
+
   return respond({ ok: true, data: { ...savedState, players, rounds } });
 }
 
@@ -143,16 +185,14 @@ function writeSheet(ss, data) {
   // 場代 + 店舗支払い
   if (venue && venue.amounts) {
     pushRow(['場代', ...venue.amounts, '', ''], true);
-    const vPayment = players.map((_, i) => i === venue.payerIndex ? venue.total : 0);
-    pushRow(['店舗支払い', ...vPayment, '', ''], true);
+    pushRow(['店舗支払い', ...venue.payment, '', ''], true);
   }
 
   // 飲み代 + 店舗支払い(複数軒対応)
   drinks.forEach((d, i) => {
     if (d && d.amounts) {
       pushRow([`飲み代${drinks.length > 1 ? i + 1 : ''}`, ...d.amounts, '', ''], true);
-      const dPayment = players.map((_, pi) => pi === d.payerIndex ? d.total : 0);
-      pushRow([`店舗支払い${drinks.length > 1 ? i + 1 : ''}`, ...dPayment, '', ''], true);
+      pushRow([`店舗支払い${drinks.length > 1 ? i + 1 : ''}`, ...d.payment, '', ''], true);
     }
   });
 
