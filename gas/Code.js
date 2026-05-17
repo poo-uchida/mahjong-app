@@ -127,9 +127,20 @@ function writeSheet(ss, data) {
     }
   });
 
-  // 収支合計は3ページ目実装時に追加
-  // const total = ...
-  // pushRow(['収支合計', ...total, '', ''], true);
+  // 収支合計: 麻雀(倍率適用後) + 場代 + 飲み代の合算
+  const mahjongTotals = players.map((_, pi) =>
+    rounds.reduce((s, r) => s + r.points[pi] * r.multiplier, 0)
+  );
+  const venueTotals = venue && venue.amounts ? venue.amounts : null;
+  if (venueTotals) {
+    const drinkTotals = players.map((_, pi) =>
+      drinks.reduce((s, d) => s + (d && d.amounts ? d.amounts[pi] : 0), 0)
+    );
+    const balance = players.map((_, pi) =>
+      mahjongTotals[pi] + venueTotals[pi] + drinkTotals[pi]
+    );
+    pushRow(['収支合計', ...balance, '', ''], true);
+  }
 
   // 値を一括書き込み
   sheet.getRange(1, 1, rows.length, numCols).setValues(rows);

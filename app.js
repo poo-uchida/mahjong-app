@@ -344,6 +344,30 @@ function handleEndGame() {
   renderPage3();
 }
 
+// --- 同期 ---
+
+async function handleSync() {
+  if (!confirm('同期しますか？未送信の変更は失われます')) return;
+  clearError();
+  const btn = document.getElementById('btnSync');
+  btn.disabled = true;
+  btn.textContent = '同期中...';
+  try {
+    const res = await gasRequest({ action: 'load', spreadsheetId: state.spreadsheetId });
+    if (!res.ok) throw new Error(res.error);
+    state = { ...res.data, password: state.password };
+    saveState();
+    showPage(state.currentPage);
+    if (state.currentPage === 2) renderPage2();
+    if (state.currentPage === 3) renderPage3();
+  } catch (err) {
+    showError('同期に失敗しました: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '同期';
+  }
+}
+
 // --- Page 3: 精算 ---
 
 let p3ListMode = 'scaled';
@@ -375,9 +399,25 @@ function initPage3() {
 function renderPage3() {
   p3ListMode = 'scaled';
   renderP3RoundsTable();
+  renderP3ConfirmedList();
   document.getElementById('p3PhaseLabel').textContent =
     state.phase === 'venue' ? '場代の精算' : '飲み代の精算';
   resetP3Input();
+}
+
+function renderP3ConfirmedList() {
+  const el = document.getElementById('p3ConfirmedList');
+  const items = [];
+  if (state.venue) {
+    items.push(`場代: ${state.venue.total.toLocaleString()}円`);
+  }
+  state.drinks.forEach((d, i) => {
+    const label = state.drinks.length > 1 ? `飲み代${i + 1}` : '飲み代';
+    items.push(`${label}: ${d.total.toLocaleString()}円`);
+  });
+  el.innerHTML = items.length
+    ? `<p class="small text-muted mb-2">確定済み: ${items.join(' / ')}</p>`
+    : '';
 }
 
 function renderP3RoundsTable() {
@@ -524,6 +564,7 @@ async function handleConfirmPage3() {
     const res = await gasRequest({ action: 'save', spreadsheetId: state.spreadsheetId, data: state });
     if (!res.ok) throw new Error(res.error);
     saveState();
+    renderP3ConfirmedList();
     document.getElementById('p3PhaseLabel').textContent = '飲み代の精算';
     resetP3Input();
   } catch (err) {
@@ -559,5 +600,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initPage1();
   initPage2();
   initPage3();
+  document.getElementById('btnSync').addEventListener('click', handleSync);
   checkResume();
 });
