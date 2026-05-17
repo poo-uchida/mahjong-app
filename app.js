@@ -335,13 +335,19 @@ async function handleConfirm() {
   }
 }
 
-function handleEndGame() {
+async function handleEndGame() {
   if (!confirm('ゲームを終了して精算に進みますか？')) return;
   state.currentPage = 3;
   state.phase = 'venue';
   saveState();
   showPage(3);
   renderPage3();
+  try {
+    const res = await gasRequest({ action: 'save', spreadsheetId: state.spreadsheetId, data: state });
+    if (!res.ok) throw new Error(res.error);
+  } catch {
+    showError('保存に失敗しました。同期ボタンで再試行してください');
+  }
 }
 
 // --- 同期 ---
@@ -352,6 +358,7 @@ async function handleSync() {
   const btn = document.getElementById('btnSync');
   btn.disabled = true;
   btn.textContent = '同期中...';
+  let success = false;
   try {
     const res = await gasRequest({ action: 'load', spreadsheetId: state.spreadsheetId });
     if (!res.ok) throw new Error(res.error);
@@ -360,11 +367,13 @@ async function handleSync() {
     showPage(state.currentPage);
     if (state.currentPage === 2) renderPage2();
     if (state.currentPage === 3) renderPage3();
+    success = true;
   } catch (err) {
     showError('同期に失敗しました: ' + err.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = '同期';
+    btn.textContent = success ? '✓ 同期済み' : '同期';
+    if (success) setTimeout(() => { btn.textContent = '同期'; }, 2000);
   }
 }
 
@@ -400,6 +409,7 @@ function renderPage3() {
   p3ListMode = 'scaled';
   renderP3RoundsTable();
   renderP3ConfirmedList();
+  renderP3Summary();
   document.getElementById('p3PhaseLabel').textContent =
     state.phase === 'venue' ? '場代の精算' : '飲み代の精算';
   resetP3Input();
@@ -418,6 +428,54 @@ function renderP3ConfirmedList() {
   el.innerHTML = items.length
     ? `<p class="small text-muted mb-2">確定済み: ${items.join(' / ')}</p>`
     : '';
+}
+
+function renderP3Summary() {
+  const { players, rounds, venue, drinks } = state;
+
+  document.getElementById('p3SummaryHeader').innerHTML =
+    `<th></th>${players.map(n => `<th class="text-end">${n}</th>`).join('')}`;
+
+  const tbody = document.getElementById('p3SummaryBody');
+  tbody.innerHTML = '';
+  if (rounds.length === 0) return;
+
+  function fmt(v) { return v === 0 ? '' : (v > 0 ? '+' : '') + v.toLocaleString(); }
+
+  function addRow(label, values, cls) {
+    const tr = document.createElement('tr');
+    if (cls) tr.className = cls;
+    tr.innerHTML = `<td>${label}</td>${values.map(v => `<td class="text-end">${fmt(v)}</td>`).join('')}`;
+    tbody.appendChild(tr);
+  }
+
+  const mahjongSettle = players.map((_, pi) =>
+    rounds.reduce((s, r) => s + r.points[pi] * r.multiplier, 0) * 10
+  );
+  addRow('麻雀精算', mahjongSettle);
+
+  if (!venue || !venue.amounts) return;
+
+  addRow('場代', venue.amounts);
+  const vPayment = players.map((_, i) => i === venue.payerIndex ? venue.total : 0);
+  addRow('店舗支払い', vPayment);
+
+  const validDrinks = drinks.filter(d => d && d.amounts);
+  validDrinks.forEach((d, i) => {
+    const label = validDrinks.length > 1 ? `飲み代${i + 1}` : '飲み代';
+    addRow(label, d.amounts);
+    const dPayment = players.map((_, pi) => pi === d.payerIndex ? d.total : 0);
+    addRow('店舗支払い', dPayment);
+  });
+
+  const balance = players.map((_, pi) => {
+    let s = mahjongSettle[pi] + venue.amounts[pi] + vPayment[pi];
+    validDrinks.forEach(d => {
+      s += d.amounts[pi] + (pi === d.payerIndex ? d.total : 0);
+    });
+    return s;
+  });
+  addRow('収支合計', balance, 'fw-bold table-light');
 }
 
 function renderP3RoundsTable() {
@@ -565,6 +623,7 @@ async function handleConfirmPage3() {
     if (!res.ok) throw new Error(res.error);
     saveState();
     renderP3ConfirmedList();
+    renderP3Summary();
     document.getElementById('p3PhaseLabel').textContent = '飲み代の精算';
     resetP3Input();
   } catch (err) {

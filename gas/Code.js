@@ -44,9 +44,24 @@ function handleSave(body) {
 
 function handleLoad(body) {
   const ss = SpreadsheetApp.openById(body.spreadsheetId);
+
   const raw = ss.getSheetByName('_state').getRange('A1').getValue();
   if (!raw) return respond({ ok: false, error: 'not_found' });
-  return respond({ ok: true, data: JSON.parse(raw) });
+  const savedState = JSON.parse(raw);
+
+  // スプレッドのヘッダー行・勝点行から players と rounds を再構築
+  const values = ss.getSheets()[0].getDataRange().getValues();
+  const players = values[0].slice(1, 5).map(String); // B〜E列のヘッダー
+  const rounds = [];
+  for (let r = 1; r < values.length; r++) { // r=0 はヘッダー
+    const row = values[r];
+    if (typeof row[0] !== 'number') break; // セパレータ行に到達したら終了
+    const points = [row[1], row[2], row[3], row[4]].map(Number);
+    const multiplier = Number(row[6]); // G列
+    rounds.push({ points, multiplier });
+  }
+
+  return respond({ ok: true, data: { ...savedState, players, rounds } });
 }
 
 function handleDelete(body) {
@@ -108,38 +123,47 @@ function writeSheet(ss, data) {
   });
 
   // 麻雀合計: 中段の縦SUM
+  const mahjongTotalRow = rowNum;
   playerCols.forEach((col, pi) => {
     formulas.push({ row: rowNum, col: pi + 2,
                     formula: `=SUM(${col}${firstLowerRow}:${col}${lastLowerRow})` });
   });
   pushRow(['麻雀合計', ...Array(players.length).fill(''), '', ''], true);
 
-  // 場代
-  const vAmounts = venue && venue.amounts ? venue.amounts : players.map(() => 0);
+  pushRow(['--- 精算 ---', ...Array(numCols - 1).fill('')], false);
+
+  // 麻雀精算: 麻雀合計 × 10
+  const mahjongSettleRow = rowNum;
+  playerCols.forEach((col, pi) => {
+    formulas.push({ row: rowNum, col: pi + 2,
+                    formula: `=${col}${mahjongTotalRow}*10` });
+  });
+  pushRow(['麻雀精算', ...Array(players.length).fill(''), '', ''], true);
+
+  // 場代 + 店舗支払い
   if (venue && venue.amounts) {
-    pushRow(['場代', ...vAmounts, '', ''], true);
+    pushRow(['場代', ...venue.amounts, '', ''], true);
+    const vPayment = players.map((_, i) => i === venue.payerIndex ? venue.total : 0);
+    pushRow(['店舗支払い', ...vPayment, '', ''], true);
   }
 
-  // 飲み代(複数軒対応)
+  // 飲み代 + 店舗支払い(複数軒対応)
   drinks.forEach((d, i) => {
     if (d && d.amounts) {
       pushRow([`飲み代${drinks.length > 1 ? i + 1 : ''}`, ...d.amounts, '', ''], true);
+      const dPayment = players.map((_, pi) => pi === d.payerIndex ? d.total : 0);
+      pushRow([`店舗支払い${drinks.length > 1 ? i + 1 : ''}`, ...dPayment, '', ''], true);
     }
   });
 
-  // 収支合計: 麻雀(倍率適用後) + 場代 + 飲み代の合算
-  const mahjongTotals = players.map((_, pi) =>
-    rounds.reduce((s, r) => s + r.points[pi] * r.multiplier, 0)
-  );
-  const venueTotals = venue && venue.amounts ? venue.amounts : null;
-  if (venueTotals) {
-    const drinkTotals = players.map((_, pi) =>
-      drinks.reduce((s, d) => s + (d && d.amounts ? d.amounts[pi] : 0), 0)
-    );
-    const balance = players.map((_, pi) =>
-      mahjongTotals[pi] + venueTotals[pi] + drinkTotals[pi]
-    );
-    pushRow(['収支合計', ...balance, '', ''], true);
+  // 収支合計: 麻雀精算〜直前行のSUM
+  if (venue && venue.amounts) {
+    const settleEndRow = rowNum - 1;
+    playerCols.forEach((col, pi) => {
+      formulas.push({ row: rowNum, col: pi + 2,
+                      formula: `=SUM(${col}${mahjongSettleRow}:${col}${settleEndRow})` });
+    });
+    pushRow(['収支合計', ...Array(players.length).fill(''), '', ''], true);
   }
 
   // 値を一括書き込み
