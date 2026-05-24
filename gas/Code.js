@@ -37,73 +37,67 @@ function handleCreate(body) {
 
 function handleSave(body) {
   const ss = SpreadsheetApp.openById(body.spreadsheetId);
-  ss.getSheetByName('_state').getRange('A1').setValue(JSON.stringify(body.data));
-  writeSheet(ss, body.data);
+  const rowInfo = writeSheet(ss, body.data);
+  writeStateSheet(ss, body.data, rowInfo);
   return respond({ ok: true });
 }
 
 function handleLoad(body) {
   const ss = SpreadsheetApp.openById(body.spreadsheetId);
 
-  const raw = ss.getSheetByName('_state').getRange('A1').getValue();
-  if (!raw) return respond({ ok: false, error: 'not_found' });
-  const savedState = JSON.parse(raw);
+  const stateSheet = ss.getSheetByName('_state');
+  const lastRow = stateSheet.getLastRow();
+  if (!lastRow) return respond({ ok: false, error: 'not_found' });
 
-  // スプレッドのヘッダー行・勝点行から players と rounds を再構築
-  const values = ss.getSheets()[0].getDataRange().getValues();
-  const players = values[0].slice(1, 5).map(String); // B〜E列のヘッダー
-  const rounds = [];
-  for (let r = 1; r < values.length; r++) { // r=0 はヘッダー
-    const row = values[r];
-    if (typeof row[0] !== 'number') break; // セパレータ行に到達したら終了
-    const points = [row[1], row[2], row[3], row[4]].map(Number);
-    const multiplier = Number(row[6]); // G列
-    rounds.push({ points, multiplier });
+  const rows = stateSheet.getRange(1, 1, lastRow, 6).getValues();
+
+  const state = { rounds: [], drinks: [] };
+  let venue = null;
+
+  for (const row of rows) {
+    const key = String(row[0]);
+    switch (key) {
+      case 'date':        state.date        = row[1]; break;
+      case 'uma1':        state.uma1        = Number(row[1]); break;
+      case 'uma2':        state.uma2        = Number(row[1]); break;
+      case 'expireAt':    state.expireAt    = Number(row[1]); break;
+      case 'currentPage': state.currentPage = Number(row[1]); break;
+      case 'phase':       state.phase       = String(row[1]); break;
+      case 'players':
+        state.players = [row[1], row[2], row[3], row[4]].map(String);
+        break;
+      case 'round': {
+        const points = [row[1], row[2], row[3], row[4]].map(Number);
+        const multiplier = Number(row[5]);
+        state.rounds.push({ points, multiplier });
+        break;
+      }
+      case 'venue':
+        venue = { total: Number(row[1]), payerIndex: Number(row[2]), roundUnit: Number(row[3]) };
+        break;
+      case 'venue.amt':
+        venue.amounts = [row[1], row[2], row[3], row[4]].map(Number);
+        break;
+      case 'venue.pay':
+        venue.payment = [row[1], row[2], row[3], row[4]].map(Number);
+        break;
+      case 'drink':
+        state.drinks.push({ total: Number(row[1]), payerIndex: Number(row[2]), roundUnit: Number(row[3]) });
+        break;
+      case 'drink.amt':
+        state.drinks[state.drinks.length - 1].amounts = [row[1], row[2], row[3], row[4]].map(Number);
+        break;
+      case 'drink.pay':
+        state.drinks[state.drinks.length - 1].payment = [row[1], row[2], row[3], row[4]].map(Number);
+        break;
+    }
   }
 
-  // 精算セクションから venue・drinks を再構築
-  const settleIdx = values.findIndex(row => row[0] === '--- 精算 ---');
-  if (settleIdx !== -1) {
-    let r = settleIdx + 1;
-    if (r < values.length && String(values[r][0]) === '麻雀精算') r++; // 麻雀精算をスキップ
+  if (venue) state.venue = venue;
+  state.spreadsheetId = body.spreadsheetId;
+  state.sheetUrl = ss.getUrl();
 
-    // 店舗支払い行をパース: 複数人分散に対応
-    function parsePayment(row) {
-      const payment = row.slice(1, 5).map(Number);
-      const payerIndex = payment.findIndex(v => v > 0); // 後方互換用(最初の支払者)
-      const total = payment.reduce((s, v) => s + v, 0);
-      return { payment, payerIndex: Math.max(payerIndex, 0), total };
-    }
-
-    // 場代
-    if (r < values.length && values[r][0] === '場代') {
-      const amounts = values[r].slice(1, 5).map(Number);
-      r++;
-      let parsed = { payment: [0,0,0,0], payerIndex: 0, total: 0 };
-      if (r < values.length && String(values[r][0]) === '店舗支払い') {
-        parsed = parsePayment(values[r]);
-        r++;
-      }
-      savedState.venue = { ...(savedState.venue || {}), amounts, ...parsed };
-    }
-
-    // 飲み代(複数軒対応)
-    const drinks = [];
-    while (r < values.length && String(values[r][0]).startsWith('飲み代')) {
-      const amounts = values[r].slice(1, 5).map(Number);
-      r++;
-      let parsed = { payment: [0,0,0,0], payerIndex: 0, total: 0 };
-      if (r < values.length && String(values[r][0]).startsWith('店舗支払い')) {
-        parsed = parsePayment(values[r]);
-        r++;
-      }
-      const existing = savedState.drinks && savedState.drinks[drinks.length];
-      drinks.push({ ...(existing || {}), amounts, ...parsed });
-    }
-    if (drinks.length > 0) savedState.drinks = drinks;
-  }
-
-  return respond({ ok: true, data: { ...savedState, players, rounds } });
+  return respond({ ok: true, data: state });
 }
 
 function handleDelete(body) {
@@ -183,16 +177,24 @@ function writeSheet(ss, data) {
   pushRow(['麻雀精算', ...Array(players.length).fill(''), '', ''], true);
 
   // 場代 + 店舗支払い
+  let venueAmountsRow = null;
+  let venuePaymentRow = null;
   if (venue && venue.amounts) {
+    venueAmountsRow = rowNum;
     pushRow(['場代', ...venue.amounts, '', ''], true);
+    venuePaymentRow = rowNum;
     pushRow(['店舗支払い', ...venue.payment, '', ''], true);
   }
 
   // 飲み代 + 店舗支払い(複数軒対応)
+  const drinkRows = [];
   drinks.forEach((d, i) => {
     if (d && d.amounts) {
+      const amountsRow = rowNum;
       pushRow([`飲み代${drinks.length > 1 ? i + 1 : ''}`, ...d.amounts, '', ''], true);
+      const paymentRow = rowNum;
       pushRow([`店舗支払い${drinks.length > 1 ? i + 1 : ''}`, ...d.payment, '', ''], true);
+      drinkRows.push({ amountsRow, paymentRow });
     }
   });
 
@@ -212,6 +214,80 @@ function writeSheet(ss, data) {
   // 計算式を書き込み
   formulas.forEach(({ row, col, formula }) => {
     sheet.getRange(row, col).setFormula(formula);
+  });
+
+  return { upperRowNums, venueAmountsRow, venuePaymentRow, drinkRows };
+}
+
+function writeStateSheet(ss, data, rowInfo) {
+  const stateSheet = ss.getSheetByName('_state');
+  stateSheet.clearContents();
+
+  const sheetName = ss.getSheets()[0].getName();
+  const { date, uma1, uma2, expireAt, currentPage, phase, players, rounds = [], venue, drinks = [] } = data;
+  const { upperRowNums, venueAmountsRow, venuePaymentRow, drinkRows } = rowInfo;
+
+  const rows     = [];
+  const formulas = []; // { row, col, formula }
+  let rowNum = 1;
+
+  function pad(row) {
+    while (row.length < 6) row.push('');
+    return row;
+  }
+
+  function pushScalar(key, ...vals) {
+    rows.push(pad([key, ...vals]));
+    rowNum++;
+  }
+
+  function pushFormulas(key, colLetters) {
+    rows.push(pad([key, ...Array(colLetters.length).fill('')]));
+    colLetters.forEach((ref, i) => {
+      formulas.push({ row: rowNum, col: i + 2, formula: `='${sheetName}'!${ref}` });
+    });
+    rowNum++;
+  }
+
+  // スカラー値
+  pushScalar('date', date);
+  pushScalar('uma1', uma1);
+  pushScalar('uma2', uma2);
+  pushScalar('expireAt', expireAt);
+  pushScalar('currentPage', currentPage);
+  pushScalar('phase', phase);
+
+  // players: ヘッダー行への参照
+  pushFormulas('players', players.map((_, i) => `${String.fromCharCode('B'.charCodeAt(0) + i)}1`));
+
+  // round: 勝点(B〜E)と倍率(G)への参照
+  rounds.forEach((_, i) => {
+    const mainRow = upperRowNums[i];
+    const refs = ['B', 'C', 'D', 'E'].map(c => `${c}${mainRow}`);
+    refs.push(`G${mainRow}`);
+    pushFormulas('round', refs);
+  });
+
+  // venue
+  if (venue && venue.amounts) {
+    pushScalar('venue', venue.total, venue.payerIndex, venue.roundUnit);
+    pushFormulas('venue.amt', ['B', 'C', 'D', 'E'].map(c => `${c}${venueAmountsRow}`));
+    pushFormulas('venue.pay', ['B', 'C', 'D', 'E'].map(c => `${c}${venuePaymentRow}`));
+  }
+
+  // drinks
+  drinks.forEach((d, i) => {
+    if (d && d.amounts) {
+      const { amountsRow, paymentRow } = drinkRows[i];
+      pushScalar('drink', d.total, d.payerIndex, d.roundUnit);
+      pushFormulas('drink.amt', ['B', 'C', 'D', 'E'].map(c => `${c}${amountsRow}`));
+      pushFormulas('drink.pay', ['B', 'C', 'D', 'E'].map(c => `${c}${paymentRow}`));
+    }
+  });
+
+  stateSheet.getRange(1, 1, rows.length, 6).setValues(rows);
+  formulas.forEach(({ row, col, formula }) => {
+    stateSheet.getRange(row, col).setFormula(formula);
   });
 }
 
