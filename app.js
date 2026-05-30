@@ -422,7 +422,7 @@ function positionOcrDropdowns(results) {
   ddContainer.innerHTML = '';
   results.forEach((r, idx) => {
     const wrapper = document.createElement('div');
-    wrapper.style.cssText = `position:absolute;left:${r.box.x * imgW}px;top:${r.box.y * imgH}px;transform:translate(-50%,-50%);`;
+    wrapper.style.cssText = `position:absolute;left:${r.box.x * imgW}px;top:${r.box.y * imgH}px;transform:translate(-50%,4px);`;
 
     const label = document.createElement('div');
     label.style.cssText = 'font-size:11px;color:#fff;text-shadow:0 0 3px #000;text-align:center;pointer-events:none;';

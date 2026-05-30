@@ -347,3 +347,16 @@ function respond(data) {
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
+// 初回認証用のテストリクエスト関数
+function testPermission() {
+  const url = 'https://vision.googleapis.com/v1/images:annotate?key=' 
+    + PropertiesService.getScriptProperties().getProperty('VISION_API_KEY');
+  // 空リクエストでも権限承認には十分
+  UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({ requests: [] }),
+    muteHttpExceptions: true
+  });
+}
