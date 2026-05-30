@@ -130,16 +130,23 @@ function handleOcr(body) {
   const imgW = Number(body.imageWidth)  || 1;
   const imgH = Number(body.imageHeight) || 1;
 
-  // 4桁前後の数字だけを抽出(7セグ卓の点数: 例 "0250" → 25000)
+  // 7セグLED数字を抽出: サイズ・桁数でフィルター
+  const MIN_W = imgW * 0.10; // 画像幅の10%以上
+  const MIN_H = imgH * 0.03; // 画像高さの3%以上
+
   const results = [];
   for (const ann of annotations) {
-    const raw = ann.description.replace(/[^0-9]/g, '');
-    if (raw.length < 3 || raw.length > 5) continue;
+    const raw = ann.description.trim();
+    if (!/^\d{3,4}$/.test(raw)) continue; // 数字のみ3〜4桁に限定
 
     const score = Number(raw) * 100;
+
     const verts = ann.boundingPoly.vertices;
     const xs = verts.map(v => v.x || 0);
     const ys = verts.map(v => v.y || 0);
+    const w = Math.max(...xs) - Math.min(...xs);
+    const h = Math.max(...ys) - Math.min(...ys);
+    if (w < MIN_W || h < MIN_H) continue; // 小さすぎる文字(行番号など)を除外
 
     results.push({
       score,
