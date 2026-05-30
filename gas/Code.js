@@ -153,7 +153,59 @@ function handleOcr(body) {
     if (results.length === 4) break;
   }
 
+  if (body.debug && body.spreadsheetId) {
+    writeOcrDebug(body.spreadsheetId, body.image, imgW, imgH, annotations, results);
+  }
+
   return respond({ ok: true, results });
+}
+
+function writeOcrDebug(spreadsheetId, imageBase64, imgW, imgH, annotations, results) {
+  const ss = SpreadsheetApp.openById(spreadsheetId);
+  let sheet = ss.getSheetByName('_debug');
+  if (!sheet) sheet = ss.insertSheet('_debug');
+  sheet.clearContents();
+
+  // 送信サイズ
+  sheet.getRange(1, 1, 1, 2).setValues([['imageWidth', 'imageHeight']]);
+  sheet.getRange(2, 1, 1, 2).setValues([[imgW, imgH]]);
+
+  // 全検出(フィルタ前)
+  sheet.getRange(4, 1, 1, 13).setValues([[
+    'description', 'v0x', 'v0y', 'v1x', 'v1y', 'v2x', 'v2y', 'v3x', 'v3y',
+    'center_px_x', 'center_px_y', 'box.x', 'box.y',
+  ]]);
+  const allRows = annotations.slice(0, 30).map(ann => {
+    const v = ann.boundingPoly.vertices;
+    const xs = v.map(p => p.x || 0);
+    const ys = v.map(p => p.y || 0);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    return [
+      ann.description,
+      v[0]?.x||0, v[0]?.y||0, v[1]?.x||0, v[1]?.y||0,
+      v[2]?.x||0, v[2]?.y||0, v[3]?.x||0, v[3]?.y||0,
+      cx, cy, cx/imgW, cy/imgH,
+    ];
+  });
+  if (allRows.length > 0) sheet.getRange(5, 1, allRows.length, 13).setValues(allRows);
+
+  // フィルタ後の results
+  const r2 = allRows.length + 7;
+  sheet.getRange(r2, 1, 1, 4).setValues([['[filtered] raw', 'score', 'box.x', 'box.y']]);
+  if (results.length > 0) {
+    sheet.getRange(r2 + 1, 1, results.length, 4).setValues(
+      results.map(r => [r.raw, r.score, r.box.x, r.box.y])
+    );
+  }
+
+  // 画像を挿入
+  try {
+    const blob = Utilities.newBlob(Utilities.base64Decode(imageBase64), 'image/jpeg', 'debug.jpg');
+    sheet.insertImage(blob, 1, r2 + results.length + 3);
+  } catch (e) {
+    sheet.getRange(r2 + results.length + 3, 1).setValue('画像挿入失敗: ' + e.message);
+  }
 }
 
 function writeSheet(ss, data) {

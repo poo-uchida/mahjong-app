@@ -392,10 +392,14 @@ async function handleOcrFile(file) {
   btn.textContent = '読み取り中...';
   try {
     const { dataUrl, base64, width, height } = await compressImage(file);
-    const res = await gasRequest({ action: 'ocr', image: base64, imageWidth: width, imageHeight: height });
+    const res = await gasRequest({
+      action: 'ocr', image: base64, imageWidth: width, imageHeight: height,
+      debug: true, spreadsheetId: state.spreadsheetId,  // デバッグ用
+    });
     if (!res.ok) throw new Error(res.error);
     if (!res.results || res.results.length === 0) throw new Error('数字を読み取れませんでした');
-    showOcrDialog(res.results, dataUrl);
+    // showOcrDialog(res.results, dataUrl);  // デバッグ中はコメントアウト
+    showError('デバッグ: スプレッドの _debug シートを確認してください');
   } catch (err) {
     showError('読み取れませんでした。手入力してください: ' + err.message);
   } finally {
