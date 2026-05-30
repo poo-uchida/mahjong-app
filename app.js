@@ -17,6 +17,7 @@ let state = {
   sheetUrl: null,
   expireAt: null,
   errorMessage: '',
+  lastAssignment: null,
 };
 
 // --- localStorage ---
@@ -192,6 +193,12 @@ function initPage2() {
   });
   document.getElementById('btnEndGame').addEventListener('click', handleEndGame);
   document.getElementById('multiplier').addEventListener('input', validateConfirmButton);
+  document.getElementById('btnOcr').addEventListener('click', () => document.getElementById('ocrFileInput').click());
+  document.getElementById('ocrFileInput').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) handleOcrFile(file);
+    e.target.value = '';
+  });
 }
 
 function renderPage2() {
@@ -348,6 +355,135 @@ async function handleEndGame() {
   } catch {
     showError('保存に失敗しました。同期ボタンで再試行してください');
   }
+}
+
+// --- OCR ---
+
+function compressImage(file) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1280;
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else       { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        resolve({ dataUrl, base64: dataUrl.split(',')[1], width: w, height: h });
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+let ocrResults = null;
+
+async function handleOcrFile(file) {
+  clearError();
+  const btn = document.getElementById('btnOcr');
+  btn.disabled = true;
+  btn.textContent = '読み取り中...';
+  try {
+    const { dataUrl, base64, width, height } = await compressImage(file);
+    const res = await gasRequest({ action: 'ocr', image: base64, imageWidth: width, imageHeight: height });
+    if (!res.ok) throw new Error(res.error);
+    if (!res.results || res.results.length === 0) throw new Error('数字を読み取れませんでした');
+    showOcrDialog(res.results, dataUrl);
+  } catch (err) {
+    showError('読み取れませんでした。手入力してください: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '画像から入力';
+  }
+}
+
+function showOcrDialog(results, imageDataUrl) {
+  ocrResults = results;
+  const overlay = document.getElementById('ocrOverlay');
+  const img     = document.getElementById('ocrPreviewImg');
+  overlay.style.display = 'flex';
+  img.onload = () => positionOcrDropdowns(results);
+  img.src = imageDataUrl;
+}
+
+function positionOcrDropdowns(results) {
+  const img = document.getElementById('ocrPreviewImg');
+  const ddContainer = document.getElementById('ocrDropdowns');
+  const { width: imgW, height: imgH } = img.getBoundingClientRect();
+  const lastAssignment = state.lastAssignment || results.map((_, i) => i);
+
+  ddContainer.innerHTML = '';
+  results.forEach((r, idx) => {
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = `position:absolute;left:${r.box.x * imgW}px;top:${r.box.y * imgH}px;transform:translate(-50%,-50%);`;
+
+    const label = document.createElement('div');
+    label.style.cssText = 'font-size:11px;color:#fff;text-shadow:0 0 3px #000;text-align:center;pointer-events:none;';
+    label.textContent = r.score !== null ? (r.score / 1000).toFixed(1) + '万' : '?';
+
+    const sel = document.createElement('select');
+    sel.id = `ocrSel${idx}`;
+    sel.className = 'form-select form-select-sm';
+    sel.style.width = '80px';
+    state.players.forEach((name, pi) => {
+      const opt = document.createElement('option');
+      opt.value = pi;
+      opt.textContent = name;
+      if ((lastAssignment[idx] ?? idx) === pi) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener('change', validateOcrOk);
+
+    wrapper.appendChild(label);
+    wrapper.appendChild(sel);
+    ddContainer.appendChild(wrapper);
+  });
+
+  validateOcrOk();
+}
+
+function validateOcrOk() {
+  if (!ocrResults) return;
+  const selected = ocrResults.map((_, i) => parseInt(document.getElementById(`ocrSel${i}`).value));
+  const counts = {};
+  selected.forEach(v => { counts[v] = (counts[v] || 0) + 1; });
+  selected.forEach((v, i) => {
+    document.getElementById(`ocrSel${i}`).classList.toggle('border-danger', counts[v] > 1);
+  });
+  document.getElementById('btnOcrOk').disabled = new Set(selected).size !== selected.length;
+}
+
+function closeOcrDialog() {
+  document.getElementById('ocrOverlay').style.display = 'none';
+  ocrResults = null;
+}
+
+function applyOcrResults() {
+  if (!ocrResults) return;
+  const assignment = ocrResults.map((_, i) => parseInt(document.getElementById(`ocrSel${i}`).value));
+  state.lastAssignment = assignment;
+  saveState();
+
+  const validScores = ocrResults.map(r => r.score ?? -Infinity);
+  const topResultIdx = validScores.indexOf(Math.max(...validScores));
+
+  assignment.forEach((playerIdx, resultIdx) => {
+    const input = document.getElementById(`score${playerIdx}`);
+    if (!input) return;
+    const isTop = resultIdx === topResultIdx;
+    input.value = (isTop || ocrResults[resultIdx].score === null) ? '' : ocrResults[resultIdx].score;
+  });
+
+  closeOcrDialog();
+  calcDone = false;
+  handleFocusOut();
 }
 
 // --- 同期 ---
@@ -657,5 +793,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initPage2();
   initPage3();
   document.getElementById('btnSync').addEventListener('click', handleSync);
+  document.getElementById('btnOcrOk').addEventListener('click', applyOcrResults);
+  document.getElementById('ocrOverlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('ocrOverlay')) closeOcrDialog();
+  });
   checkResume();
 });

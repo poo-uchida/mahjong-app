@@ -74,6 +74,10 @@
         <tbody id="p2InputBody"></tbody>
       </table>
     </div>
+    <div class="d-flex gap-2 mb-2">
+      <button id="btnOcr" class="btn btn-sm btn-outline-secondary">画像から入力</button>
+      <input type="file" id="ocrFileInput" accept="image/*" capture="environment" class="d-none">
+    </div>
     <div class="row g-2 align-items-center mb-3">
       <div class="col-auto"><label class="col-form-label">倍率</label></div>
       <div class="col-3">
@@ -148,6 +152,16 @@
         <thead class="table-light"><tr id="p3SummaryHeader"></tr></thead>
         <tbody id="p3SummaryBody"></tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- OCR割り当てダイアログ -->
+  <div id="ocrOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1050;align-items:center;justify-content:center;">
+    <div style="position:relative;max-width:100vw;max-height:100vh;">
+      <img id="ocrPreviewImg" style="display:block;max-width:100vw;max-height:90vh;object-fit:contain;">
+      <div id="ocrDropdowns"></div>
+      <button id="btnOcrOk" class="btn btn-primary btn-sm" disabled
+              style="position:absolute;bottom:8px;right:8px;">OK</button>
     </div>
   </div>
 

@@ -14,6 +14,7 @@ function doPost(e) {
       case 'save':   return handleSave(body);
       case 'load':   return handleLoad(body);
       case 'delete': return handleDelete(body);
+      case 'ocr':    return handleOcr(body);
       default:       return respond({ ok: false, error: 'unknown_action' });
     }
   } catch (err) {
@@ -103,6 +104,56 @@ function handleLoad(body) {
 function handleDelete(body) {
   DriveApp.getFileById(body.spreadsheetId).setTrashed(true);
   return respond({ ok: true });
+}
+
+function handleOcr(body) {
+  const apiKey = PropertiesService.getScriptProperties().getProperty('VISION_API_KEY');
+  if (!apiKey) return respond({ ok: false, error: 'VISION_API_KEY not set' });
+
+  const url = `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`;
+  const payload = JSON.stringify({
+    requests: [{
+      image: { content: body.image },
+      features: [{ type: 'TEXT_DETECTION' }],
+    }],
+  });
+
+  const res = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    payload,
+  });
+
+  const json = JSON.parse(res.getContentText());
+  const annotations = (json.responses[0].textAnnotations || []).slice(1); // 先頭は全文なのでスキップ
+
+  const imgW = Number(body.imageWidth)  || 1;
+  const imgH = Number(body.imageHeight) || 1;
+
+  // 4桁前後の数字だけを抽出(7セグ卓の点数: 例 "0250" → 25000)
+  const results = [];
+  for (const ann of annotations) {
+    const raw = ann.description.replace(/[^0-9]/g, '');
+    if (raw.length < 3 || raw.length > 5) continue;
+
+    const score = Number(raw) * 100;
+    const verts = ann.boundingPoly.vertices;
+    const xs = verts.map(v => v.x || 0);
+    const ys = verts.map(v => v.y || 0);
+
+    results.push({
+      score,
+      raw: ann.description,
+      box: {
+        x: ((Math.min(...xs) + Math.max(...xs)) / 2) / imgW,
+        y: ((Math.min(...ys) + Math.max(...ys)) / 2) / imgH,
+      },
+    });
+
+    if (results.length === 4) break;
+  }
+
+  return respond({ ok: true, results });
 }
 
 function writeSheet(ss, data) {
