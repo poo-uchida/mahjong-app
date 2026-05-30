@@ -392,14 +392,10 @@ async function handleOcrFile(file) {
   btn.textContent = '読み取り中...';
   try {
     const { dataUrl, base64, width, height } = await compressImage(file);
-    const res = await gasRequest({
-      action: 'ocr', image: base64, imageWidth: width, imageHeight: height,
-      debug: true, spreadsheetId: state.spreadsheetId,  // デバッグ用
-    });
+    const res = await gasRequest({ action: 'ocr', image: base64, imageWidth: width, imageHeight: height });
     if (!res.ok) throw new Error(res.error);
     if (!res.results || res.results.length === 0) throw new Error('数字を読み取れませんでした');
-    // showOcrDialog(res.results, dataUrl);  // デバッグ中はコメントアウト
-    showError('デバッグ: スプレッドの _debug シートを確認してください');
+    showOcrDialog(res.results, dataUrl);
   } catch (err) {
     showError('読み取れませんでした。手入力してください: ' + err.message);
   } finally {
@@ -415,6 +411,7 @@ function showOcrDialog(results, imageDataUrl) {
   const overlay = document.getElementById('ocrOverlay');
   const img     = document.getElementById('ocrPreviewImg');
   overlay.style.display = 'flex';
+  document.getElementById('btnOcrOk').disabled = false;
   img.onload = () => {
     positionOcrDropdowns(results);
     if (ocrResizeHandler) window.removeEventListener('resize', ocrResizeHandler);
@@ -431,33 +428,28 @@ function positionOcrDropdowns(results) {
   const lastAssignment = state.lastAssignment || results.map((_, i) => i);
 
   ddContainer.innerHTML = '';
-  results.forEach((r, idx) => {
-    const wrapper = document.createElement('div');
-    wrapper.style.cssText = `position:absolute;left:${r.box.x * imgW}px;top:${r.box.y * imgH}px;transform:translate(-50%,-50%);pointer-events:auto;`;
+
+  // 黄色い位置確認ボックス
+  results.forEach((r) => {
+    const box = document.createElement('div');
+    box.style.cssText = `position:absolute;left:${r.box.x * imgW}px;top:${r.box.y * imgH}px;transform:translate(-50%,-50%);border:2px solid yellow;padding:2px 4px;pointer-events:none;`;
 
     const label = document.createElement('div');
-    label.style.cssText = 'font-size:11px;color:#fff;text-shadow:0 0 3px #000;text-align:center;pointer-events:none;';
-    label.textContent = r.score !== null ? (r.score / 1000).toFixed(1) + '万' : '?';
+    label.style.cssText = 'font-size:12px;color:yellow;text-shadow:0 0 3px #000;text-align:center;white-space:nowrap;';
+    label.textContent = r.raw;
 
-    const sel = document.createElement('select');
-    sel.id = `ocrSel${idx}`;
-    sel.className = 'form-select form-select-sm';
-    sel.style.width = '80px';
-    state.players.forEach((name, pi) => {
-      const opt = document.createElement('option');
-      opt.value = pi;
-      opt.textContent = name;
-      if ((lastAssignment[idx] ?? idx) === pi) opt.selected = true;
-      sel.appendChild(opt);
-    });
-    sel.addEventListener('change', validateOcrOk);
-
-    wrapper.appendChild(label);
-    wrapper.appendChild(sel);
-    ddContainer.appendChild(wrapper);
+    box.appendChild(label);
+    ddContainer.appendChild(box);
   });
 
-  validateOcrOk();
+  // デバッグ情報パネル(右下)
+  const info = document.createElement('div');
+  info.style.cssText = 'position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,0.7);color:#ff0;font-size:10px;padding:4px 6px;line-height:1.5;pointer-events:none;white-space:pre;';
+  info.textContent = `img: ${Math.round(imgW)}x${Math.round(imgH)}\n`
+    + results.map((r, i) =>
+        `[${i}] raw=${r.raw} (${r.box.x.toFixed(3)}, ${r.box.y.toFixed(3)}) → px(${Math.round(r.box.x * imgW)}, ${Math.round(r.box.y * imgH)})`
+      ).join('\n');
+  ddContainer.appendChild(info);
 }
 
 function validateOcrOk() {
