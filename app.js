@@ -404,12 +404,19 @@ async function handleOcrFile(file) {
   }
 }
 
+let ocrResizeHandler = null;
+
 function showOcrDialog(results, imageDataUrl) {
   ocrResults = results;
   const overlay = document.getElementById('ocrOverlay');
   const img     = document.getElementById('ocrPreviewImg');
   overlay.style.display = 'flex';
-  img.onload = () => positionOcrDropdowns(results);
+  img.onload = () => {
+    positionOcrDropdowns(results);
+    if (ocrResizeHandler) window.removeEventListener('resize', ocrResizeHandler);
+    ocrResizeHandler = () => positionOcrDropdowns(results);
+    window.addEventListener('resize', ocrResizeHandler);
+  };
   img.src = imageDataUrl;
 }
 
@@ -422,7 +429,7 @@ function positionOcrDropdowns(results) {
   ddContainer.innerHTML = '';
   results.forEach((r, idx) => {
     const wrapper = document.createElement('div');
-    wrapper.style.cssText = `position:absolute;left:${r.box.x * imgW}px;top:${r.box.y * imgH}px;transform:translate(-50%,4px);`;
+    wrapper.style.cssText = `position:absolute;left:${r.box.x * imgW}px;top:${r.box.y * imgH}px;transform:translate(-50%,-50%);pointer-events:auto;`;
 
     const label = document.createElement('div');
     label.style.cssText = 'font-size:11px;color:#fff;text-shadow:0 0 3px #000;text-align:center;pointer-events:none;';
@@ -462,6 +469,10 @@ function validateOcrOk() {
 
 function closeOcrDialog() {
   document.getElementById('ocrOverlay').style.display = 'none';
+  if (ocrResizeHandler) {
+    window.removeEventListener('resize', ocrResizeHandler);
+    ocrResizeHandler = null;
+  }
   ocrResults = null;
 }
 
