@@ -375,7 +375,7 @@ function compressImage(file) {
         canvas.width = w; canvas.height = h;
         const ctx = canvas.getContext('2d');
         // LED(赤)を際立たせる: コントラスト強調 + 彩度を上げる
-        ctx.filter = 'contrast(200%) saturate(200%)';
+        ctx.filter = 'contrast(1000%)';
         ctx.drawImage(img, 0, 0, w, h);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
         resolve({ dataUrl, base64: dataUrl.split(',')[1], width: w, height: h });
