@@ -374,9 +374,17 @@ function compressImage(file) {
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
         const ctx = canvas.getContext('2d');
-        // LED(赤)を際立たせる: コントラスト強調 + 彩度を上げる
-        ctx.filter = 'contrast(1000%)';
         ctx.drawImage(img, 0, 0, w, h);
+        const imageData = ctx.getImageData(0, 0, w, h);
+        const d = imageData.data;
+        const contrast = 150;
+        const f = (259 * (contrast + 255)) / (255 * (259 - contrast));
+        for (let i = 0; i < d.length; i += 4) {
+          d[i]   = Math.min(255, Math.max(0, f * (d[i]   - 128) + 128));
+          d[i+1] = Math.min(255, Math.max(0, f * (d[i+1] - 128) + 128));
+          d[i+2] = Math.min(255, Math.max(0, f * (d[i+2] - 128) + 128));
+        }
+        ctx.putImageData(imageData, 0, 0);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
         resolve({ dataUrl, base64: dataUrl.split(',')[1], width: w, height: h });
       };
