@@ -385,42 +385,26 @@ function compressImage(file) {
 }
 
 let ocrResults = null;
-let pendingOcrData = null;
 
 async function handleOcrFile(file) {
   clearError();
   const btn = document.getElementById('btnOcr');
   btn.disabled = true;
-  btn.textContent = '処理中...';
-  try {
-    const { dataUrl, base64, width, height } = await compressImage(file);
-    pendingOcrData = { base64, width, height };
-    showOcrPreview(dataUrl);
-  } catch (err) {
-    closeOcrDialog();
-    showError('読み取れませんでした。手入力してください: ' + err.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '画像から入力';
-  }
-}
-
-async function startOcrRecognition() {
-  if (!pendingOcrData) return;
-  const { base64, width, height } = pendingOcrData;
-  const btn = document.getElementById('btnOcrStart');
-  btn.disabled = true;
   btn.textContent = '読み取り中...';
   try {
+    const { dataUrl, base64, width, height } = await compressImage(file);
+    showOcrPreview(dataUrl);
     const res = await gasRequest({ action: 'ocr', image: base64, imageWidth: width, imageHeight: height });
     if (res.ok && res.results && res.results.length > 0) {
-      btn.style.display = 'none';
       showOcrBoxes(res.results);
     } else {
       closeOcrDialog();
     }
   } catch {
     closeOcrDialog();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '画像から入力';
   }
 }
 
@@ -429,10 +413,6 @@ let ocrResizeHandler = null;
 function showOcrPreview(imageDataUrl) {
   document.getElementById('ocrDropdowns').innerHTML = '';
   document.getElementById('btnOcrOk').disabled = true;
-  const startBtn = document.getElementById('btnOcrStart');
-  startBtn.disabled = false;
-  startBtn.textContent = '認識する';
-  startBtn.style.display = 'block';
   document.getElementById('ocrOverlay').style.display = 'flex';
   document.getElementById('ocrPreviewImg').src = imageDataUrl;
 }
@@ -496,13 +476,11 @@ function validateOcrOk() {
 
 function closeOcrDialog() {
   document.getElementById('ocrOverlay').style.display = 'none';
-  document.getElementById('btnOcrStart').style.display = 'none';
   if (ocrResizeHandler) {
     window.removeEventListener('resize', ocrResizeHandler);
     ocrResizeHandler = null;
   }
   ocrResults = null;
-  pendingOcrData = null;
 }
 
 function applyOcrResults() {
@@ -834,7 +812,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initPage3();
   document.getElementById('btnSync').addEventListener('click', handleSync);
   document.getElementById('btnOcrOk').addEventListener('click', applyOcrResults);
-  document.getElementById('btnOcrStart').addEventListener('click', startOcrRecognition);
   document.getElementById('ocrOverlay').addEventListener('click', e => {
     if (e.target === document.getElementById('ocrOverlay')) closeOcrDialog();
   });
