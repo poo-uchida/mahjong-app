@@ -385,6 +385,9 @@ function compressImage(file) {
           d[i+2] = Math.min(255, Math.max(0, f * (d[i+2] - 128) + 128));
         }
         ctx.putImageData(imageData, 0, 0);
+        // デバッグ: canvas出力確認用の赤四角
+        ctx.fillStyle = 'rgba(255,0,0,0.8)';
+        ctx.fillRect(0, 0, 80, 80);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
         resolve({ dataUrl, base64: dataUrl.split(',')[1], width: w, height: h });
       };
