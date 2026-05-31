@@ -395,11 +395,13 @@ async function handleOcrFile(file) {
   btn.textContent = '読み取り中...';
   try {
     const { dataUrl, base64, width, height } = await compressImage(file);
+    showOcrPreview(dataUrl);  // 前処理済み画像をすぐ表示
     const res = await gasRequest({ action: 'ocr', image: base64, imageWidth: width, imageHeight: height });
     if (!res.ok) throw new Error(res.error);
     if (!res.results || res.results.length === 0) throw new Error('数字を読み取れませんでした');
-    showOcrDialog(res.results, dataUrl);
+    showOcrBoxes(res.results);  // 検出結果を重ねる
   } catch (err) {
+    closeOcrDialog();
     showError('読み取れませんでした。手入力してください: ' + err.message);
   } finally {
     btn.disabled = false;
@@ -409,19 +411,25 @@ async function handleOcrFile(file) {
 
 let ocrResizeHandler = null;
 
-function showOcrDialog(results, imageDataUrl) {
+function showOcrPreview(imageDataUrl) {
+  document.getElementById('ocrDropdowns').innerHTML = '';
+  document.getElementById('btnOcrOk').disabled = true;
+  document.getElementById('ocrOverlay').style.display = 'flex';
+  document.getElementById('ocrPreviewImg').src = imageDataUrl;
+}
+
+function showOcrBoxes(results) {
   ocrResults = results;
-  const overlay = document.getElementById('ocrOverlay');
-  const img     = document.getElementById('ocrPreviewImg');
-  overlay.style.display = 'flex';
-  document.getElementById('btnOcrOk').disabled = false;
-  img.onload = () => {
+  const img = document.getElementById('ocrPreviewImg');
+  const reposition = () => {
     positionOcrDropdowns(results);
+    document.getElementById('btnOcrOk').disabled = false;
     if (ocrResizeHandler) window.removeEventListener('resize', ocrResizeHandler);
     ocrResizeHandler = () => positionOcrDropdowns(results);
     window.addEventListener('resize', ocrResizeHandler);
   };
-  img.src = imageDataUrl;
+  if (img.complete) reposition();
+  else img.onload = reposition;
 }
 
 function positionOcrDropdowns(results) {
