@@ -52,12 +52,18 @@ async function gasRequest(body) {
 function showError(msg) {
   const el = document.getElementById('errorArea');
   el.textContent = msg;
-  el.classList.toggle('d-none', !msg);
+  el.className = `alert alert-danger mx-3 mt-3 py-2${msg ? '' : ' d-none'}`;
   state.errorMessage = msg;
 }
 
 function clearError() {
   showError('');
+}
+
+function showInfo(msg) {
+  const el = document.getElementById('errorArea');
+  el.textContent = msg;
+  el.className = 'alert alert-info mx-3 mt-3 py-2';
 }
 
 // --- ページ切替 ---
@@ -106,8 +112,10 @@ function checkResume() {
   if (!saved) return;
   state = saved;
   showPage(state.currentPage);
+  if (state.currentPage === 1) initPage1Values();
   if (state.currentPage === 2) renderPage2();
   if (state.currentPage === 3) renderPage3();
+  showInfo('前回の続きを再開しました');
 }
 
 // --- 初期化 ---
