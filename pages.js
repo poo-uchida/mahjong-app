@@ -63,7 +63,7 @@ async function handleStart() {
     if (!res.ok) throw new Error(res.error);
     state = { ...state, date, players, uma1, uma2,
               spreadsheetId: res.spreadsheetId, sheetUrl: res.sheetUrl,
-              expireAt: Date.now() + ONE_DAY_MS, rounds: [] };
+              expireAt: Date.now() + ONE_DAY_MS, rounds: [], currentPage: 2 };
     saveState();
     showPage(2);
     renderPage2();
